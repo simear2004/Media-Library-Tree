@@ -1676,6 +1676,8 @@ function on_script_unload() {
 function on_font_changed() {
 	get_font();
 	applyDpiScaling();
+	recalcVisibleItems();
+	updateScrollbarState();
 	cache.needRecalc = true;
 	window.Repaint();
 }
