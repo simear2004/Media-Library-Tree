@@ -5,7 +5,6 @@ window.DrawMode = 1;
 
 // ========== Win32 绘制常量 ==========
 const DT_LEFT = 0x00000000;
-const DT_RIGHT = 0x00000002;
 const DT_CENTER = 0x00000001;
 const DT_VCENTER = 0x00000004;
 const DT_SINGLELINE = 0x00000020;
@@ -37,8 +36,6 @@ const CONFIG = {
 	sideMarkerHeightRatio: 0.5,
 
 	// ---- 箭头图标 ----
-	treeArrowFontName: 'Segoe UI Symbol',
-	treeArrowFontSize: 16,
 	arrowIconSize: 14,
 	arrowIconOffsetX: 5,
 
@@ -122,13 +119,11 @@ const search = {
 	visibleIds: null,
 	inputActive: false,
 	start: 0,
-	end: 0,
-	offset: 0
+	end: 0
 };
 
 const nowPlaying = {
 	node: null,
-	trackPath: '',
 	nodePath: new Set()
 };
 
@@ -139,7 +134,6 @@ const library = {
 };
 
 const ui = {
-	isWallpaper: false,
 	clearBtnRect: null,
 	userSelectingNode: false
 };
@@ -166,8 +160,6 @@ const theme = {
 const fonts = {
 	main: null,
 	large: null,
-	search: null,
-	treeArrow: null,
 	scrollbarArrow: null,
 	searchIcon: null,
 	clearBtn: null
@@ -222,7 +214,6 @@ function applyDpiScaling() {
 
 	CONFIG.itemHeight                = Math.floor(((h && h > 0) ? h : 35) * zdpi);
 	CONFIG.indentPerLevel            = Math.floor(zdpi * 14);
-	CONFIG.treeArrowFontSize         = Math.floor(zdpi * 16);
 	CONFIG.arrowIconSize             = Math.floor(zdpi * 14);
 	CONFIG.arrowIconOffsetX          = Math.floor(zdpi * 5);
 	CONFIG.sideMarkerWidth           = Math.floor(zdpi * 4);
@@ -239,7 +230,6 @@ function applyDpiScaling() {
 	CONFIG.minThumbHeight            = Math.floor(zdpi * 20);
 	CONFIG.scrollbarArrowFontSize    = Math.floor(zdpi * 10);
 
-	fonts.treeArrow      = gdi.Font(CONFIG.treeArrowFontName, CONFIG.treeArrowFontSize, 1);
 	fonts.scrollbarArrow = gdi.Font(CONFIG.scrollbarArrowFontName, CONFIG.scrollbarArrowFontSize);
 	fonts.searchIcon     = gdi.Font(CONFIG.searchIconFontName, CONFIG.searchIconFontSize);
 	fonts.clearBtn       = gdi.Font(CONFIG.clearBtnFontName, CONFIG.searchIconFontSize);
@@ -485,7 +475,6 @@ function clearSearch() {
 	search.cursorPos = 0;
 	search.start = 0;
 	search.end = 0;
-	search.offset = 0;
 	for (let i = 0; i < tree.data.length; i++) {
 		tree.data[i].searchCount = undefined;
 	}
@@ -550,7 +539,7 @@ function drawSearchbar(gr) {
 	}
 
 	if (search.text) {
-		const displayText = search.text.substring(search.offset);
+		const displayText = search.text;
 		gr.GdiDrawText(displayText, fonts.main, theme.textColor,
 			textStartX, 0, textRectW, CONFIG.searchBarHeight,
 			DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
@@ -562,7 +551,7 @@ function drawSearchbar(gr) {
 	}
 
 	if (search.inputActive && search.cursorVisible && search.start == search.end) {
-		const cursorText = search.text.substring(search.offset, search.cursorPos);
+		const cursorText = search.text.substring(0, search.cursorPos);
 		const cursorX = textStartX + gr.CalcTextWidth(cursorText, fonts.main);
 		const cursorHeight = Math.min(CONFIG.searchBarHeight - 10, CONFIG.searchTextFontSize);
 		const cursorY = Math.floor((CONFIG.searchBarHeight - cursorHeight) / 2);
@@ -897,7 +886,6 @@ function updateNowPlayingNode() {
 	if (!fb.IsPlaying) {
 		nowPlaying.nodePath.clear();
 		nowPlaying.node = null;
-		nowPlaying.trackPath = '';
 		return;
 	}
 	const handle = fb.GetNowPlaying();
@@ -920,9 +908,7 @@ function updateNowPlayingNode() {
 
 	nowPlaying.nodePath.clear();
 	nowPlaying.node = null;
-	nowPlaying.trackPath = '';
 
-	nowPlaying.trackPath = path;
 	nowPlaying.node = foundNode;
 
 	nowPlaying.nodePath.add(foundNode.id);
@@ -1157,7 +1143,6 @@ function scheduleTreeLoad() {
 function refresh() {
 	tree.selected = null;
 	nowPlaying.node = null;
-	nowPlaying.trackPath = '';
 	nowPlaying.nodePath.clear();
 	scroll.position = 0;
 	library.isEmpty = false;
@@ -1241,7 +1226,6 @@ function on_mouse_lbtn_down(x, y) {
 		search.cursorPos = search.text.length;
 		search.start = search.cursorPos;
 		search.end = search.cursorPos;
-		search.offset = 0;
 		startSearchCursorBlink();
 		window.Repaint();
 		return;
@@ -1600,7 +1584,6 @@ function on_playback_stop(reason) {
 	if (reason === 2) return;
 	nowPlaying.nodePath.clear();
 	nowPlaying.node = null;
-	nowPlaying.trackPath = '';
 	window.Repaint();
 }
 
@@ -1666,7 +1649,6 @@ function on_script_unload() {
 	tree.cachedVisible = null;
 	tree.selected = null;
 	nowPlaying.node = null;
-	nowPlaying.trackPath = '';
 	nowPlaying.nodePath.clear();
 	search.text = '';
 	search.visibleIds = null;
