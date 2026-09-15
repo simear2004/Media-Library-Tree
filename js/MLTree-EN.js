@@ -1,5 +1,5 @@
 'use strict';
-window.DefinePanel("media library tree", {author: "添加硬件"});
+window.DefinePanel("media library tree", {author: "yeyo"});
 window.DlgCode = 0x0004;
 window.DrawMode = 1;
 
