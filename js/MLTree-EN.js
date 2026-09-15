@@ -1597,7 +1597,7 @@ function on_item_focus_change() {
 	const itemIndex = library.handles.Find(handle);
 	if (itemIndex === -1) return;
 
-	const targetNode = findNodeByHandleIndex(itemIndex);
+	let targetNode = findNodeByHandleIndex(itemIndex);
 	if (!targetNode) {
 		if (search.text) {
 			clearSearch();
@@ -1616,7 +1616,7 @@ function on_item_focus_change() {
 	targetNode.selected = true;
 	tree.selected = targetNode;
 
-	scrollToNode(targetNode, false);
+	scrollToNode(targetNode, true);
 	window.Repaint();
 }
 
