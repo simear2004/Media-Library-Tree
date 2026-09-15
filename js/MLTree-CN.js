@@ -1598,9 +1598,19 @@ function on_item_focus_change() {
 	if (itemIndex === -1) return;
 
 	const targetNode = findNodeByHandleIndex(itemIndex);
-	if (!targetNode) return;
+	if (!targetNode) {
+		if (search.text) {
+			clearSearch();
+			targetNode = findNodeByHandleIndex(itemIndex);
+		}
+		if (!targetNode) return;
+	}
 
-	if (tree.selected && tree.selected.id === targetNode.id) return;
+	if (tree.selected && tree.selected.id === targetNode.id) {
+		scrollToNode(targetNode, true);
+		window.Repaint();
+		return;
+	}
 
 	if (tree.selected) tree.selected.selected = false;
 	targetNode.selected = true;
