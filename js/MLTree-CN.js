@@ -4,7 +4,6 @@ window.DlgCode = 0x0004;
 window.DrawMode = 1;
 
 // ========== Win32 绘制常量 ==========
-const ICON_FONT_NAME = 'Guifx v2 Transports';
 const DT_LEFT = 0x00000000;
 const DT_CENTER = 0x00000001;
 const DT_VCENTER = 0x00000004;
@@ -29,6 +28,7 @@ let zdpi = 1;                        // 缩放因子
 let g_fname = 'Microsoft YaHei UI';  // 基准字体名
 
 // ========== 配置常量 ==========
+const ICON_FONT_NAME = 'Guifx v2 Transports';
 const CONFIG = {
 	// ---- 节点布局 ----
 	itemHeight: 35,
