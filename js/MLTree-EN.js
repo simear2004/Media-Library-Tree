@@ -1730,10 +1730,6 @@ function on_mouse_leave() {
 
 function on_playback_new_track() {
 	updateNowPlayingNode();
-	if (nowPlaying.node) {
-		const visibleTarget = getVisibleAncestor(nowPlaying.node);
-		if (visibleTarget) scrollToNode(visibleTarget, true);
-	}
 	window.Repaint();
 }
 
