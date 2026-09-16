@@ -4,7 +4,6 @@ window.DlgCode = 0x0004;
 window.DrawMode = 1;
 
 // ========== Win32 Drawing Constants ==========
-const ICON_FONT_NAME = 'Guifx v2 Transports';
 const DT_LEFT = 0x00000000;
 const DT_CENTER = 0x00000001;
 const DT_VCENTER = 0x00000004;
@@ -29,6 +28,7 @@ let zdpi = 1;                        // DPI scale factor
 let g_fname = 'Microsoft YaHei UI';  // base font name
 
 // ========== Configuration ==========
+const ICON_FONT_NAME = 'Guifx v2 Transports';
 const CONFIG = {
 	// ---- Node Layout ----
 	itemHeight: 35,
