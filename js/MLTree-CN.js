@@ -1281,7 +1281,6 @@ function refresh() {
 	tree.selected = null;
 	nowPlaying.node = null;
 	nowPlaying.nodePath.clear();
-	scroll.position = 0;
 	library.isEmpty = false;
 	scheduleTreeLoad();
 }
@@ -1731,6 +1730,10 @@ function on_mouse_leave() {
 
 function on_playback_new_track() {
 	updateNowPlayingNode();
+	if (nowPlaying.node) {
+		const visibleTarget = getVisibleAncestor(nowPlaying.node);
+		if (visibleTarget) scrollToNode(visibleTarget, true);
+	}
 	window.Repaint();
 }
 
