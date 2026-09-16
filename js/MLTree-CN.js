@@ -23,12 +23,12 @@ const FontTypeDUI = {
 	playlists: 3
 };
 
-// ========== DUI 运行时变量 ==========
-let zdpi = 1;                        // 缩放因子
-let g_fname = 'Microsoft YaHei UI';  // 基准字体名
+// ========== 加载所需字体 ==========
+const TEXT_FONT_NAME = 'Microsoft YaHei UI';
+const ICON_FONT_NAME = 'Guifx v2 Transports';
+const SYMBOL_FONT_NAME = 'Segoe UI Symbol';
 
 // ========== 配置常量 ==========
-const ICON_FONT_NAME = 'Guifx v2 Transports';
 const CONFIG = {
 	// ---- 节点布局 ----
 	itemHeight: 35,
@@ -47,7 +47,8 @@ const CONFIG = {
 	searchBarPadding: 8,
 	searchTextSize: 12,
 	searchIconSize: 16,
-	clearBtnFontName: 'Wingdings 2',
+	clearBtnFontName: SYMBOL_FONT_NAME,
+	clearBtnIconChar: String.fromCodePoint(0x1F7A9),
 
 	// ---- 曲目计数 ----
 	trackCountPadding: 14,
@@ -60,8 +61,10 @@ const CONFIG = {
 	scrollbarHideDelay: 1500,
 	scrollbarCheckExtraWidth: 5,
 	minThumbHeight: 20,
-	scrollbarArrowFontName: 'Segoe UI Symbol',
 	scrollbarArrowSize: 10,
+	scrollbarArrowFontName: SYMBOL_FONT_NAME,
+	scrollbarArrowUpChar:   String.fromCodePoint(0x25B2),
+	scrollbarArrowDownChar: String.fromCodePoint(0x25BC),
 
 	// ---- 行为 ----
 	scrollStep: 3,
@@ -168,6 +171,9 @@ const fonts = {
 	clearBtn: null
 };
 
+// ========== 缩放因子 ==========
+let zdpi = 1; 
+
 // ========== 数据结构 ==========
 function TreeNode(id, name, type, parentId, data) {
 	this.id = id;
@@ -193,22 +199,20 @@ function get_color() {
 }
 
 function get_font() {
-	let fsize = 12;
+	let fname  = TEXT_FONT_NAME;
+	let fsize  = 12;
 	let fstyle = 0;
-	try {
-		const f = window.GetFontDUI(FontTypeDUI.playlists);
-		g_fname = f.Name;
-		fsize = f.Size;
-		fstyle = f.Style;
-	} catch (e) {
-		console.log("字体警告：无法使用默认字体，改用 Microsoft YaHei UI");
-		g_fname = 'Microsoft YaHei UI';
-		fsize = 12;
-		fstyle = 0;
+
+	const f = window.GetFontDUI(FontTypeDUI.playlists);
+	if (f && f.Name) {
+		fname  = f.Name;
+		fsize  = f.Size  || fsize;
+		fstyle = f.Style || fstyle;
 	}
+
 	zdpi = fsize / 12;
-	fonts.main  = gdi.Font(g_fname, fsize, fstyle);
-	fonts.large = gdi.Font(g_fname, fsize * 1.35, 2);
+	fonts.main  = gdi.Font(fname, fsize, fstyle);
+	fonts.large = gdi.Font(fname, fsize * 1.35, 2);
 }
 
 // ========== DPI 缩放 ==========
@@ -531,11 +535,11 @@ function drawSearchbar(gr) {
 	let textRectW = view.w - textStartX - paddingX;
 
 	if (search.text) {
-		const clearBtnW = gr.CalcTextWidth(String.fromCharCode(0xF0CE), fonts.clearBtn) + 8;
+		const clearBtnW = gr.CalcTextWidth(CONFIG.clearBtnIconChar, fonts.clearBtn) + 8;
 		const clearBtnX = view.w - paddingX - clearBtnW;
 		ui.clearBtnRect = { x: clearBtnX, y: 0, w: clearBtnW, h: CONFIG.searchBarHeight };
 		textRectW = clearBtnX - textStartX - 4;
-		gr.GdiDrawText(String.fromCharCode(0xF0CE), fonts.clearBtn, iconColor,
+		gr.GdiDrawText(CONFIG.clearBtnIconChar, fonts.clearBtn, iconColor,
 			clearBtnX, 0, clearBtnW, CONFIG.searchBarHeight,
 			DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 	} else {
@@ -666,10 +670,10 @@ function drawScrollbar(gr) {
 	if (currentWidth > CONFIG.scrollbarNarrowWidth) {
 		gr.FillSolidRect(actualX, trackTop, currentWidth, trackH, theme.textColor & 0x15ffffff);
 
-		gr.GdiDrawText('▲', fonts.scrollbarArrow, getArrowColor('up'),
+		gr.GdiDrawText(CONFIG.scrollbarArrowUpChar, fonts.scrollbarArrow, getArrowColor('up'),
 			actualX, trackTop, currentWidth, CONFIG.scrollbarButtonHeight,
 			DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-		gr.GdiDrawText('▼', fonts.scrollbarArrow, getArrowColor('down'),
+		gr.GdiDrawText(CONFIG.scrollbarArrowDownChar, fonts.scrollbarArrow, getArrowColor('down'),
 			actualX, view.h - CONFIG.scrollbarButtonHeight, currentWidth, CONFIG.scrollbarButtonHeight,
 			DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 	}
