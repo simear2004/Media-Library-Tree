@@ -4,6 +4,7 @@ window.DlgCode = 0x0004;
 window.DrawMode = 1;
 
 // ========== Win32 Drawing Constants ==========
+const ICON_FONT_NAME = 'Guifx v2 Transports';
 const DT_LEFT = 0x00000000;
 const DT_CENTER = 0x00000001;
 const DT_VCENTER = 0x00000004;
@@ -38,12 +39,14 @@ const CONFIG = {
 	// ---- Tree Arrow Icon ----
 	arrowIconSize: 14,
 	arrowIconOffsetX: 5,
+	arrowIconCollapsed: String.fromCharCode(0x3E),
+	arrowIconExpanded:  String.fromCharCode(0x2C),
 
 	// ---- Search Bar ----
 	searchBarHeight: 35,
 	searchBarPadding: 8,
-	searchTextFontSize: 12,
-	searchIconFontSize: 16,
+	searchTextSize: 12,
+	searchIconSize: 16,
 	searchIconFontName: 'Guifx v2 Transports',
 	clearBtnFontName: 'Wingdings 2',
 
@@ -59,7 +62,7 @@ const CONFIG = {
 	scrollbarCheckExtraWidth: 5,
 	minThumbHeight: 20,
 	scrollbarArrowFontName: 'Segoe UI Symbol',
-	scrollbarArrowFontSize: 10,
+	scrollbarArrowSize: 10,
 
 	// ---- Behavior ----
 	scrollStep: 3,
@@ -160,6 +163,7 @@ const theme = {
 const fonts = {
 	main: null,
 	large: null,
+	arrowIcon: null,
 	scrollbarArrow: null,
 	searchIcon: null,
 	clearBtn: null
@@ -219,8 +223,8 @@ function applyDpiScaling() {
 	CONFIG.sideMarkerWidth           = Math.floor(zdpi * 4);
 	CONFIG.searchBarHeight           = Math.floor(zdpi * 35);
 	CONFIG.searchBarPadding          = Math.floor(zdpi * 8);
-	CONFIG.searchTextFontSize        = Math.floor(zdpi * 12);
-	CONFIG.searchIconFontSize        = Math.floor(zdpi * 16);
+	CONFIG.searchTextSize        = Math.floor(zdpi * 12);
+	CONFIG.searchIconSize        = Math.floor(zdpi * 16);
 	CONFIG.trackCountOffsetFromRight = Math.floor(zdpi * 15);
 	CONFIG.trackCountPadding         = Math.floor(zdpi * 14);
 	CONFIG.scrollbarWidth            = Math.floor(zdpi * 10);
@@ -228,11 +232,12 @@ function applyDpiScaling() {
 	CONFIG.scrollbarButtonHeight     = Math.floor(zdpi * 12);
 	CONFIG.scrollbarCheckExtraWidth  = Math.floor(zdpi * 5);
 	CONFIG.minThumbHeight            = Math.floor(zdpi * 20);
-	CONFIG.scrollbarArrowFontSize    = Math.floor(zdpi * 10);
+	CONFIG.scrollbarArrowSize    = Math.floor(zdpi * 10);
 
-	fonts.scrollbarArrow = gdi.Font(CONFIG.scrollbarArrowFontName, CONFIG.scrollbarArrowFontSize);
-	fonts.searchIcon     = gdi.Font(CONFIG.searchIconFontName, CONFIG.searchIconFontSize);
-	fonts.clearBtn       = gdi.Font(CONFIG.clearBtnFontName, CONFIG.searchIconFontSize);
+	fonts.scrollbarArrow = gdi.Font(CONFIG.scrollbarArrowFontName, CONFIG.scrollbarArrowSize);
+	fonts.searchIcon     = gdi.Font(ICON_FONT_NAME, CONFIG.searchIconSize);
+	fonts.clearBtn       = gdi.Font(CONFIG.clearBtnFontName, CONFIG.searchIconSize);
+	fonts.arrowIcon      = gdi.Font(ICON_FONT_NAME, CONFIG.arrowIconSize);
 }
 
 function recalcCountWidths(gr) {
@@ -553,7 +558,7 @@ function drawSearchbar(gr) {
 	if (search.inputActive && search.cursorVisible && search.start == search.end) {
 		const cursorText = search.text.substring(0, search.cursorPos);
 		const cursorX = textStartX + gr.CalcTextWidth(cursorText, fonts.main);
-		const cursorHeight = Math.min(CONFIG.searchBarHeight - 10, CONFIG.searchTextFontSize);
+		const cursorHeight = Math.min(CONFIG.searchBarHeight - 10, CONFIG.searchTextSize);
 		const cursorY = Math.floor((CONFIG.searchBarHeight - cursorHeight) / 2);
 		gr.DrawLine(cursorX, cursorY, cursorX, cursorY + cursorHeight, 1, theme.textColor);
 	}
@@ -599,10 +604,10 @@ function drawTreeNode(gr, node, yPos, rowIndex) {
 	let textX;
 
 	if (node.type === 'folder' && node.children.length > 0) {
-		const iconText = node.expanded ? 'v' : '>';
-		gr.GdiDrawText(iconText, fonts.main, rowTextColor,
+		const iconText = node.expanded ? CONFIG.arrowIconExpanded : CONFIG.arrowIconCollapsed;
+		gr.GdiDrawText(iconText, fonts.arrowIcon, rowTextColor & 0x80ffffff,
 			arrowX, yPos, CONFIG.arrowIconSize, CONFIG.itemHeight,
-			DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+			DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 		textX = arrowX + CONFIG.arrowIconSize;
 	} else if (node.type === 'track') {
 		gr.GdiDrawText('\u266A', fonts.main, rowTextColor,
