@@ -47,7 +47,6 @@ const CONFIG = {
 	searchBarPadding: 8,
 	searchTextSize: 12,
 	searchIconSize: 16,
-	searchIconFontName: 'Guifx v2 Transports',
 	clearBtnFontName: 'Wingdings 2',
 
 	// ---- 曲目计数 ----
