@@ -10,6 +10,7 @@ const DT_VCENTER = 0x00000004;
 const DT_SINGLELINE = 0x00000020;
 const DT_NOPREFIX = 0x00000800;
 const DT_END_ELLIPSIS = 0x00008000;
+const MF_GRAYED = 0x00000001;
 
 // ========== DUI 枚举 ==========
 const ColourTypeDUI = {
@@ -124,7 +125,11 @@ const search = {
 	visibleIds: null,
 	inputActive: false,
 	start: 0,
-	end: 0
+	end: 0,
+	mouseSelecting: false,
+	anchor: 0,
+	textStartX: 0,
+	charWidths: []
 };
 
 const nowPlaying = {
@@ -226,8 +231,8 @@ function applyDpiScaling() {
 	CONFIG.sideMarkerWidth           = Math.floor(zdpi * 4);
 	CONFIG.searchBarHeight           = Math.floor(zdpi * 35);
 	CONFIG.searchBarPadding          = Math.floor(zdpi * 8);
-	CONFIG.searchTextSize        = Math.floor(zdpi * 12);
-	CONFIG.searchIconSize        = Math.floor(zdpi * 16);
+	CONFIG.searchTextSize            = Math.floor(zdpi * 12);
+	CONFIG.searchIconSize            = Math.floor(zdpi * 16);
 	CONFIG.trackCountOffsetFromRight = Math.floor(zdpi * 15);
 	CONFIG.trackCountPadding         = Math.floor(zdpi * 14);
 	CONFIG.scrollbarWidth            = Math.floor(zdpi * 10);
@@ -235,7 +240,7 @@ function applyDpiScaling() {
 	CONFIG.scrollbarButtonHeight     = Math.floor(zdpi * 12);
 	CONFIG.scrollbarCheckExtraWidth  = Math.floor(zdpi * 5);
 	CONFIG.minThumbHeight            = Math.floor(zdpi * 20);
-	CONFIG.scrollbarArrowSize    = Math.floor(zdpi * 10);
+	CONFIG.scrollbarArrowSize        = Math.floor(zdpi * 10);
 
 	fonts.scrollbarArrow = gdi.Font(CONFIG.scrollbarArrowFontName, CONFIG.scrollbarArrowSize);
 	fonts.searchIcon     = gdi.Font(ICON_FONT_NAME, CONFIG.searchIconSize);
@@ -513,14 +518,112 @@ function stopSearchCursorBlink() {
 	}
 }
 
+// ========== 搜索栏编辑操作 ==========
+function searchHasSelection() {
+	return search.start !== search.end;
+}
+
+function searchSelectionRange() {
+	const s = Math.min(search.start, search.end);
+	const e = Math.max(search.start, search.end);
+	return { start: s, end: e };
+}
+
+function searchReplaceRange(start, end, text, cursorPos) {
+	search.text      = search.text.substring(0, start) + text + search.text.substring(end);
+	search.cursorPos = cursorPos;
+	search.start     = cursorPos;
+	search.end       = cursorPos;
+	search.inputActive = true;
+	startSearchCursorBlink();
+	performSearch();
+	scroll.position = 0;
+	window.Repaint();
+}
+
+function searchCut() {
+	if (!searchHasSelection()) return;
+	const r = searchSelectionRange();
+	try { utils.SetClipboardText(search.text.substring(r.start, r.end)); } catch (e) {}
+	searchReplaceRange(r.start, r.end, '', r.start);
+}
+
+function searchCopy() {
+	if (!searchHasSelection()) return;
+	const r = searchSelectionRange();
+	try { utils.SetClipboardText(search.text.substring(r.start, r.end)); } catch (e) {}
+}
+
+function searchPaste() {
+	let clip = '';
+	try { clip = utils.GetClipboardText() || ''; } catch (e) {}
+	if (!clip) return;
+	const r = searchHasSelection()
+		? searchSelectionRange()
+		: { start: search.cursorPos, end: search.cursorPos };
+	searchReplaceRange(r.start, r.end, clip, r.start + clip.length);
+}
+
+function searchSelectAll() {
+	if (!search.text) return;
+	search.start     = 0;
+	search.end       = search.text.length;
+	search.cursorPos = search.text.length;
+	search.inputActive = true;
+	startSearchCursorBlink();
+	window.Repaint();
+}
+
+function searchHitTest(x) {
+	if (!search.text) return 0;
+	const startX = search.textStartX;
+	if (x <= startX) return 0;
+	const w = search.charWidths;
+	if (!w || w.length < 2) return search.text.length;
+	for (let i = 1; i < w.length; i++) {
+		if (x < startX + w[i]) {
+			const mid = startX + (w[i - 1] + w[i]) / 2;
+			return x < mid ? i - 1 : i;
+		}
+	}
+	return search.text.length;
+}
+
+function showSearchContextMenu(x, y) {
+	let clip = '';
+	try { clip = utils.GetClipboardText() || ''; } catch (e) {}
+
+	const hasSel  = searchHasSelection();
+	const hasText = search.text.length > 0;
+	const hasClip = clip.length > 0;
+
+	const menu = window.CreatePopupMenu();
+	menu.AppendMenuItem(hasSel  ? 0 : MF_GRAYED, 1, '剪切');
+	menu.AppendMenuItem(hasSel  ? 0 : MF_GRAYED, 2, '复制');
+	menu.AppendMenuItem(hasClip ? 0 : MF_GRAYED, 3, '粘贴');
+	menu.AppendMenuSeparator();
+	menu.AppendMenuItem(hasText ? 0 : MF_GRAYED, 4, '全选');
+	menu.AppendMenuItem(hasText ? 0 : MF_GRAYED, 5, '清除');
+
+	switch (menu.TrackPopupMenu(x, y)) {
+		case 1: searchCut();       break;
+		case 2: searchCopy();      break;
+		case 3: searchPaste();     break;
+		case 4: searchSelectAll(); break;
+		case 5: clearSearch();     break;
+	}
+}
+
 // ========== 绘制函数 ==========
 function drawSearchbar(gr) {
-	const searchBgColor = search.inputActive
-		? ((theme.textColor & 0x00ffffff) | 0x20000000)
-		: ((theme.textColor & 0x00ffffff) | 0x0C000000);
-	gr.FillSolidRect(0, 0, view.w, CONFIG.searchBarHeight, searchBgColor);
+	if (search.inputActive) {
+		gr.FillSolidRect(0, 0, view.w, CONFIG.searchBarHeight,
+			(theme.textColor & 0x00ffffff) | 0x05ffffff);
+	}
 
-	const sepColor = (theme.textColor & 0x00ffffff) | 0x10ffffff;
+	const sepColor = search.inputActive
+		? (theme.hlColor & 0x00ffffff) | 0xff000000
+		: (theme.textColor & 0x00ffffff) | 0x10ffffff;
 	gr.FillSolidRect(0, CONFIG.searchBarHeight - 1, view.w, 1, sepColor);
 
 	const paddingX = CONFIG.searchBarPadding;
@@ -547,11 +650,37 @@ function drawSearchbar(gr) {
 	}
 
 	if (search.text) {
-		const displayText = search.text;
-		gr.GdiDrawText(displayText, fonts.main, theme.textColor,
-			textStartX, 0, textRectW, CONFIG.searchBarHeight,
-			DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+		search.textStartX = textStartX;
+
+		search.charWidths = [0];
+		for (let i = 1; i <= search.text.length; i++) {
+			search.charWidths.push(
+				gr.CalcTextWidth(search.text.substring(0, i), fonts.main));
+		}
+
+		const textFlags = DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX;
+
+		if (searchHasSelection()) {
+			const r  = searchSelectionRange();
+			const cw = search.charWidths;
+			const preX  = textStartX + cw[r.start];
+			const selW  = cw[r.end] - cw[r.start];
+			const preT  = search.text.substring(0, r.start);
+			const selT  = search.text.substring(r.start, r.end);
+			const postT = search.text.substring(r.end);
+
+			gr.FillSolidRect(preX, 4, selW, CONFIG.searchBarHeight - 8, theme.stColor);
+
+			let x = textStartX;
+			if (preT)  { gr.GdiDrawText(preT,  fonts.main, theme.textColor, x, 0, view.w - x, CONFIG.searchBarHeight, textFlags); x += cw[r.start]; }
+			if (selT)  { gr.GdiDrawText(selT,  fonts.main, theme.textColor, x, 0, view.w - x, CONFIG.searchBarHeight, textFlags); x += selW; }
+			if (postT) { gr.GdiDrawText(postT, fonts.main, theme.textColor, x, 0, view.w - x, CONFIG.searchBarHeight, textFlags); }
+		} else {
+			gr.GdiDrawText(search.text, fonts.main, theme.textColor,
+				textStartX, 0, textRectW, CONFIG.searchBarHeight, textFlags);
+		}
 	} else if (!search.inputActive) {
+		search.charWidths = [];
 		const placeholderColor = (theme.textColor & 0x00ffffff) | 0x40000000;
 		gr.GdiDrawText('搜索', fonts.main, placeholderColor,
 			textStartX, 0, textRectW, CONFIG.searchBarHeight,
@@ -1231,9 +1360,12 @@ function on_mouse_lbtn_down(x, y) {
 			return;
 		}
 		search.inputActive = true;
-		search.cursorPos = search.text.length;
-		search.start = search.cursorPos;
-		search.end = search.cursorPos;
+		const hit = searchHitTest(x);
+		search.cursorPos = hit;
+		search.start = hit;
+		search.end = hit;
+		search.anchor = hit;
+		search.mouseSelecting = true;
 		startSearchCursorBlink();
 		window.Repaint();
 		return;
@@ -1282,6 +1414,11 @@ function on_mouse_lbtn_down(x, y) {
 }
 
 function on_mouse_lbtn_up(x, y) {
+	if (search.mouseSelecting) {
+		search.mouseSelecting = false;
+		return true;
+	}
+	
 	if (scroll.dragging) {
 		scroll.dragging = false;
 
@@ -1361,13 +1498,8 @@ function on_mouse_wheel(delta) {
 
 function on_mouse_rbtn_up(x, y) {
 	if (y < CONFIG.searchBarHeight) {
-		if (search.text) {
-			const menu = window.CreatePopupMenu();
-			menu.AppendMenuItem(0, 1, '清除搜索');
-			const result = menu.TrackPopupMenu(x, y);
-			if (result === 1) clearSearch();
-		}
-		return;
+		showSearchContextMenu(x, y);
+		return true;
 	}
 
 	const adjustedY = y - CONFIG.searchBarHeight;
@@ -1375,7 +1507,7 @@ function on_mouse_rbtn_up(x, y) {
 	const visibleNodes = getVisibleNodes();
 	if (itemIndex >= 0 && itemIndex < visibleNodes.length) {
 		const node = visibleNodes[itemIndex];
-		if (node.type === 'root') return;
+		if (node.type === 'root') return true;
 
 		const menu = window.CreatePopupMenu();
 		menu.AppendMenuItem(0, 1, '发送到当前列表');
@@ -1413,6 +1545,20 @@ function on_mouse_move(x, y) {
 	const wasMinimized = scroll.minimized;
 	const wasHover = scroll.hover;
 	const wasArrowHover = scroll.arrowHover;
+
+	if (search.mouseSelecting && search.inputActive) {
+		const hit = searchHitTest(x);
+		search.cursorPos = hit;
+		if (hit < search.anchor) {
+			search.start = hit;
+			search.end   = search.anchor;
+		} else {
+			search.start = search.anchor;
+			search.end   = hit;
+		}
+		window.RepaintRect(0, 0, view.w, CONFIG.searchBarHeight, true);
+		return;
+	}
 
 	if (scroll.dragging) {
 		const deltaY = y - scroll.dragStartY;
