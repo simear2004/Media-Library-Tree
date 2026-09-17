@@ -1,7 +1,7 @@
 'use strict';
 window.DefinePanel("media library tree", {author: "yeyo"});
 window.DlgCode = 0x0004;
-window.DrawMode = 1;
+window.DrawMode = 1; // 0 = GDI，1 = D2D
 
 // ========== Win32 Drawing Constants ==========
 const DT_LEFT = 0x00000000;
@@ -189,6 +189,26 @@ const fonts = {
 
 // ========== DPI scale factor ==========
 let zdpi = 1; 
+
+// ========== GDI+ Text alignment assistance ==========
+function StringFormat() {
+	var h_align = 0,
+	v_align = 0,
+	trimming = 0,
+	flags = 0;
+	switch (arguments.length) {
+	case 3:
+		trimming = arguments[2];
+	case 2:
+		v_align = arguments[1];
+	case 1:
+		h_align = arguments[0];
+		break;
+	default:
+		return 0;
+	};
+	return ((h_align << 28) | (v_align << 24) | (trimming << 20) | flags);
+};
 
 // ========== Data Structure ==========
 function TreeNode(id, name, type, parentId, data) {
@@ -641,21 +661,23 @@ function showSearchContextMenu(x, y) {
 function drawSearchbar(gr) {
 	if (search.inputActive) {
 		gr.FillSolidRect(0, 0, view.w, CONFIG.searchBarHeight,
-			(theme.textColor & 0x00ffffff) | 0x05ffffff);
+      theme.textColor & 0x05ffffff);
 	}
 
 	const sepColor = search.inputActive
-		? (theme.hlColor & 0x00ffffff) | 0xff000000
-		: (theme.textColor & 0x00ffffff) | 0x10ffffff;
+    ? theme.hlColor 
+    : theme.textColor & 0x33ffffff;
 	gr.FillSolidRect(0, CONFIG.searchBarHeight - 1, view.w, 1, sepColor);
 
 	const paddingX = CONFIG.searchBarPadding;
 
-	const iconColor = search.inputActive ? theme.textColor : ((theme.textColor & 0x00ffffff) | 0x60000000);
+	const iconColor = search.inputActive
+    ? theme.hlColor 
+    : theme.textColor & 0x80ffffff;
 	const iconWidth = gr.CalcTextWidth(')', fonts.searchIcon) + 4;
-	gr.GdiDrawText(')', fonts.searchIcon, iconColor,
+	gr.DrawString(')', fonts.searchIcon, iconColor,
 		paddingX + 2, 0, iconWidth, CONFIG.searchBarHeight,
-		DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+		StringFormat(0, 1));
 
 	let textStartX = paddingX + iconWidth + 4;
 	let textRectW = view.w - textStartX - paddingX;
@@ -665,9 +687,9 @@ function drawSearchbar(gr) {
 		const clearBtnX = view.w - paddingX - clearBtnW;
 		ui.clearBtnRect = { x: clearBtnX, y: 0, w: clearBtnW, h: CONFIG.searchBarHeight };
 		textRectW = clearBtnX - textStartX - 4;
-		gr.GdiDrawText(CONFIG.clearBtnIconChar, fonts.clearBtn, iconColor,
+		gr.DrawString(CONFIG.clearBtnIconChar, fonts.clearBtn, iconColor,
 			clearBtnX, 0, clearBtnW, CONFIG.searchBarHeight,
-			DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+			StringFormat(0, 1));
 	} else {
 		ui.clearBtnRect = null;
 	}
@@ -704,10 +726,9 @@ function drawSearchbar(gr) {
 		}
 	} else if (!search.inputActive) {
 		search.charWidths = [];
-		const placeholderColor = (theme.textColor & 0x00ffffff) | 0x40000000;
-		gr.GdiDrawText('Search', fonts.main, placeholderColor,
+		gr.DrawString('Search', fonts.main, theme.textColor & 0x80ffffff,
 			textStartX, 0, textRectW, CONFIG.searchBarHeight,
-			DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+			StringFormat(0, 1));
 	}
 
 	if (search.inputActive && search.cursorVisible && search.start == search.end) {
@@ -760,9 +781,9 @@ function drawTreeNode(gr, node, yPos, rowIndex) {
 
 	if (node.type === 'folder' && node.children.length > 0) {
 		const iconText = node.expanded ? CONFIG.arrowIconExpanded : CONFIG.arrowIconCollapsed;
-		gr.GdiDrawText(iconText, fonts.arrowIcon, rowTextColor & 0x80ffffff,
+		gr.DrawString(iconText, fonts.arrowIcon, rowTextColor & 0x80ffffff,
 			arrowX, yPos, CONFIG.arrowIconSize, CONFIG.itemHeight,
-			DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+			StringFormat(0, 1));
 		textX = arrowX + CONFIG.arrowIconSize;
 	} else if (node.type === 'track') {
 		gr.GdiDrawText('\u266A', fonts.main, rowTextColor,
@@ -822,12 +843,12 @@ function drawScrollbar(gr) {
 	if (currentWidth > CONFIG.scrollbarNarrowWidth) {
 		gr.FillSolidRect(actualX, trackTop, currentWidth, trackH, theme.textColor & 0x15ffffff);
 
-		gr.GdiDrawText(CONFIG.scrollbarArrowUpChar, fonts.scrollbarArrow, getArrowColor('up'),
+		gr.DrawString(CONFIG.scrollbarArrowUpChar, fonts.scrollbarArrow, getArrowColor('up'),
 			actualX, trackTop, currentWidth, CONFIG.scrollbarButtonHeight,
-			DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-		gr.GdiDrawText(CONFIG.scrollbarArrowDownChar, fonts.scrollbarArrow, getArrowColor('down'),
+			StringFormat(1, 1));
+		gr.DrawString(CONFIG.scrollbarArrowDownChar, fonts.scrollbarArrow, getArrowColor('down'),
 			actualX, view.h - CONFIG.scrollbarButtonHeight, currentWidth, CONFIG.scrollbarButtonHeight,
-			DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+			StringFormat(1, 1));
 	}
 
 	let thumbColor;
@@ -1320,6 +1341,8 @@ function on_paint(gr) {
 	if (!gr) return;
 	gr.FillSolidRect(0, 0, view.w, view.h, theme.bgColor);
 
+	gr.SetTextRenderingHint(4);
+	
 	drawSearchbar(gr);
 
 	if (!tree.data || tree.data.length === 0) {
