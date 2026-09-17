@@ -12,12 +12,23 @@ const DT_NOPREFIX = 0x00000800;
 const DT_END_ELLIPSIS = 0x00008000;
 const MF_GRAYED = 0x00000001;
 
-// ========== DUI 枚举 ==========
+// ========== DUI / CUI 枚举 ==========
+const ColorTypeCUI = {
+	text: 0,
+	selection_text: 1,
+	background: 3,
+	selection_background: 4
+};
+
 const ColourTypeDUI = {
 	text: 0,
 	background: 1,
 	highlight: 2,
 	selection: 3
+};
+
+const FontTypeCUI = {
+	items: 0
 };
 
 const FontTypeDUI = {
@@ -197,18 +208,30 @@ function TreeNode(id, name, type, parentId, data) {
 
 // ========== DUI 颜色 / 字体 ==========
 function get_color() {
-	theme.textColor = window.GetColourDUI(ColourTypeDUI.text);
-	theme.bgColor   = window.GetColourDUI(ColourTypeDUI.background);
-	theme.stColor   = window.GetColourDUI(ColourTypeDUI.selection);
-	theme.hlColor   = window.GetColourDUI(ColourTypeDUI.highlight);
+	if (window.InstanceType == 0) {
+		theme.textColor = window.GetColourCUI(ColorTypeCUI.text);
+		theme.stColor = window.GetColourCUI(ColorTypeCUI.selection_background);
+		theme.bgColor = window.GetColourCUI(ColorTypeCUI.background);
+		theme.hlColor = window.GetColourCUI(ColorTypeCUI.selection_text);
+	} else if (window.InstanceType == 1) {
+		theme.textColor = window.GetColourDUI(ColourTypeDUI.text);
+		theme.bgColor   = window.GetColourDUI(ColourTypeDUI.background);
+		theme.stColor   = window.GetColourDUI(ColourTypeDUI.selection);
+		theme.hlColor   = window.GetColourDUI(ColourTypeDUI.highlight);
+	}
 }
 
 function get_font() {
 	let fname  = TEXT_FONT_NAME;
 	let fsize  = 12;
 	let fstyle = 0;
-
-	const f = window.GetFontDUI(FontTypeDUI.playlists);
+	let f;
+	
+	if (window.InstanceType == 0) {
+		f = window.GetFontCUI(FontTypeCUI.items);
+	} else if (window.InstanceType == 1) {
+		f = window.GetFontDUI(FontTypeDUI.playlists);
+	}
 	if (f && f.Name) {
 		fname  = f.Name;
 		fsize  = f.Size  || fsize;
