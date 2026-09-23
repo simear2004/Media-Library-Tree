@@ -1315,6 +1315,15 @@ function scheduleTreeLoad() {
 		loadFolderTree();
 		if (search.text) performSearch();
 		updateNowPlayingNode();
+		if (nowPlaying.node) {
+			const visibleTarget = getVisibleAncestor(nowPlaying.node);
+			if (visibleTarget) {
+				if (tree.selected) tree.selected.selected = false;
+				visibleTarget.selected = true;
+				tree.selected = visibleTarget;
+				scrollToNode(visibleTarget, true);
+			}
+		}
 		updateScrollbarState();
 		window.Repaint();
 		timers.loading = null;
