@@ -80,7 +80,7 @@ const CONFIG = {
 
 	// ---- 行为 ----
 	scrollStep: 3,
-	loadDelay: 100,
+	loadDelay: 5,
 
 	// ---- 文本 ----
 	loadingText: '加载中...',
@@ -310,74 +310,76 @@ function loadFolderTree() {
 	const rootNode = new TreeNode('root', CONFIG.rootNodeName, 'root', null);
 	rootNode.expanded = true;
 	tree.data.push(rootNode);
+	tree.byId.set('root', rootNode);
 
 	library.handles = fb.GetLibraryItems();
-	if (library.handles.Count > 0) {
-		const firstPath = library.handles[0].Path;
-		if (firstPath) {
-			const dir = firstPath.substring(0, firstPath.lastIndexOf('\\'));
-			const parts = dir.split('\\');
-			library.root = parts.slice(0, -1).join('\\') + '\\';
-		}
-	}
 	const total = library.handles.Count;
 	library.isEmpty = (total === 0);
 
 	if (library.isEmpty) {
-		tree.byId.set(rootNode.id, rootNode);
 		updateScrollbarState();
 		window.Repaint();
 		return;
 	}
 
-	const relativePaths = library.handles.GetLibraryRelativePaths();
-	const folderTree = {};
+	const firstPath = library.handles[0].Path;
+	if (firstPath) {
+		const dir = firstPath.substring(0, firstPath.lastIndexOf('\\'));
+		const parts = dir.split('\\');
+		library.root = parts.slice(0, -1).join('\\') + '\\';
+	} else {
+		library.root = '';
+	}
 
+	const relativePaths = library.handles.GetLibraryRelativePaths();
+	const rawTree = {};
 	for (let i = 0; i < total; i++) {
 		const relPath = relativePaths[i] || '';
 		if (!relPath) {
-			if (!folderTree[CONFIG.rootDirName]) folderTree[CONFIG.rootDirName] = {};
-			if (!folderTree[CONFIG.rootDirName].__tracks__) folderTree[CONFIG.rootDirName].__tracks__ = [];
-			if (!folderTree[CONFIG.rootDirName].__direct_tracks__) folderTree[CONFIG.rootDirName].__direct_tracks__ = [];
-			folderTree[CONFIG.rootDirName].__tracks__.push(i);
-			folderTree[CONFIG.rootDirName].__direct_tracks__.push(i);
-		} else {
-			const parts = relPath.split('\\').filter(function(p) { return p; });
-			if (parts.length <= 1) {
-				if (!folderTree[CONFIG.rootDirName]) folderTree[CONFIG.rootDirName] = {};
-				if (!folderTree[CONFIG.rootDirName].__tracks__) folderTree[CONFIG.rootDirName].__tracks__ = [];
-				if (!folderTree[CONFIG.rootDirName].__direct_tracks__) folderTree[CONFIG.rootDirName].__direct_tracks__ = [];
-				folderTree[CONFIG.rootDirName].__tracks__.push(i);
-				folderTree[CONFIG.rootDirName].__direct_tracks__.push(i);
-			} else {
-				let current = folderTree;
-				for (let j = 0; j < parts.length - 1; j++) {
-					const part = parts[j];
-					if (!current[part]) current[part] = {};
-					if (!current[part].__tracks__) current[part].__tracks__ = [];
-					current = current[part];
-					current.__tracks__.push(i);
-					if (j === parts.length - 2) {
-						if (!current.__direct_tracks__) current.__direct_tracks__ = [];
-						current.__direct_tracks__.push(i);
-					}
-				}
+			pushTrackToRaw(rawTree, CONFIG.rootDirName, i);
+			continue;
+		}
+		const parts = relPath.split('\\').filter(function(p) { return p; });
+		if (parts.length <= 1) {
+			pushTrackToRaw(rawTree, CONFIG.rootDirName, i);
+			continue;
+		}
+		let current = rawTree;
+		for (let j = 0; j < parts.length - 1; j++) {
+			const part = parts[j];
+			if (!current[part]) current[part] = {};
+			if (!current[part].__tracks__) current[part].__tracks__ = [];
+			current = current[part];
+			current.__tracks__.push(i);
+			if (j === parts.length - 2) {
+				if (!current.__direct_tracks__) current.__direct_tracks__ = [];
+				current.__direct_tracks__.push(i);
 			}
 		}
 	}
 
-	createFolderNodesFromTree(folderTree, rootNode, '');
+	createFolderNodesFromTree(rawTree, rootNode, '');
 
-	rootNode.trackCount = library.handles ? library.handles.Count : 0;
+	rootNode.trackCount = total;
 	rootNode.name = CONFIG.rootNodeName + ' (' + rootNode.children.length + '个文件夹)';
 
-	for (let k = 0; k < tree.data.length; k++) {
-		tree.byId.set(tree.data[k].id, tree.data[k]);
-	}
+	updateScrollbarState();
+	window.Repaint();
+}
+
+function pushTrackToRaw(rawTree, key, idx) {
+	if (!rawTree[key]) rawTree[key] = {};
+	if (!rawTree[key].__tracks__) rawTree[key].__tracks__ = [];
+	if (!rawTree[key].__direct_tracks__) rawTree[key].__direct_tracks__ = [];
+	rawTree[key].__tracks__.push(idx);
+	rawTree[key].__direct_tracks__.push(idx);
 }
 
 function createFolderNodesFromTree(nodeTree, parentNode, currentPath) {
-	const keys = Object.keys(nodeTree).filter(function(k) { return k !== '__tracks__' && k !== '__direct_tracks__'; });
+	const keys = [];
+	for (const k in nodeTree) {
+		if (k !== '__tracks__' && k !== '__direct_tracks__') keys.push(k);
+	}
 	keys.sort(function(a, b) { return collator.compare(a, b); });
 
 	for (let i = 0; i < keys.length; i++) {
@@ -386,31 +388,32 @@ function createFolderNodesFromTree(nodeTree, parentNode, currentPath) {
 		const node = new TreeNode('folder_' + fullPath, folderName, 'folder', parentNode.id);
 		node.data.path = fullPath;
 		node.data.fullPath = fullPath;
+		node.level = parentNode.level + 1;
 		parentNode.children.push(node);
 		tree.data.push(node);
+		tree.byId.set(node.id, node);
+
 		createFolderNodesFromTree(nodeTree[folderName], node, fullPath);
 
 		const tracks = nodeTree[folderName].__tracks__ || [];
 		node.trackCount = tracks.length;
 
 		if (tracks.length > 0) {
-			const sortedTracks = tracks.slice().sort(function(a, b) { return a - b; });
-			let start = sortedTracks[0];
-			let end = sortedTracks[0];
-			for (let ti = 1; ti < sortedTracks.length; ti++) {
-				if (sortedTracks[ti] === end + 1) {
-					end = sortedTracks[ti];
+			let start = tracks[0];
+			let end = tracks[0];
+			for (let ti = 1; ti < tracks.length; ti++) {
+				if (tracks[ti] === end + 1) {
+					end = tracks[ti];
 				} else {
 					node.item.push({start: start, end: end});
-					start = sortedTracks[ti];
-					end = sortedTracks[ti];
+					start = tracks[ti];
+					end = tracks[ti];
 				}
 			}
 			node.item.push({start: start, end: end});
 		}
 
 		const directTracks = nodeTree[folderName].__direct_tracks__ || [];
-
 		if (directTracks.length > 0) {
 			const decorated = directTracks.map(function(t) {
 				const h = library.handles[t];
@@ -441,8 +444,10 @@ function createFolderNodesFromTree(nodeTree, parentNode, currentPath) {
 				trackNode.data.path = trackPath;
 				trackNode.data.handleIndex = trackIndex;
 				trackNode.data.subSong = subSong;
+				trackNode.level = node.level + 1;
 				node.children.push(trackNode);
 				tree.data.push(trackNode);
+				tree.byId.set(trackNode.id, trackNode);
 			}
 		}
 	}
@@ -1071,8 +1076,6 @@ function updateNowPlayingNode() {
 	}
 	const handle = fb.GetNowPlaying();
 	if (!handle) return;
-	const path = handle.Path;
-	if (!path) return;
 	if (!library.handles) return;
 	const npIndex = library.handles.Find(handle);
 	if (npIndex === -1) return;
@@ -1089,9 +1092,7 @@ function updateNowPlayingNode() {
 
 	nowPlaying.nodePath.clear();
 	nowPlaying.node = null;
-
 	nowPlaying.node = foundNode;
-
 	nowPlaying.nodePath.add(foundNode.id);
 
 	for (let j = 0; j < foundNode.children.length; j++) {
@@ -1815,7 +1816,7 @@ function on_item_focus_change() {
 	}
 
 	if (tree.selected && tree.selected.id === targetNode.id) {
-		scrollToNode(targetNode, true);
+		scrollToNode(targetNode, false);
 		window.Repaint();
 		return;
 	}
