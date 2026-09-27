@@ -361,7 +361,7 @@ function loadFolderTree() {
 	createFolderNodesFromTree(rawTree, rootNode, '');
 
 	rootNode.trackCount = total;
-	rootNode.name = CONFIG.rootNodeName + ' (' + rootNode.children.length + '个文件夹)';
+	rootNode.name = CONFIG.rootNodeName + ' (' + rootNode.children.length + 'folders)';
 
 	updateScrollbarState();
 	window.Repaint();
