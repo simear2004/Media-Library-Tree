@@ -2,6 +2,7 @@
 window.DefinePanel("media library tree", {author: "添加硬件"});
 window.DlgCode = 0x0004;
 window.DrawMode = 1; // 0 = GDI，1 = D2D
+let collapseWholeTracks = !!window.GetProperty("显示整轨", true);
 
 // ========== Win32 绘制常量 ==========
 const DT_LEFT = 0x00000000;
@@ -448,6 +449,42 @@ function createFolderNodesFromTree(nodeTree, parentNode, currentPath) {
 				node.children.push(trackNode);
 				tree.data.push(trackNode);
 				tree.byId.set(trackNode.id, trackNode);
+			}
+
+			if (collapseWholeTracks) {
+				const byPathMap = new Map();
+				for (let j = 0; j < decorated.length; j++) {
+					const h = library.handles[decorated[j].idx];
+					if ((h.SubSong || 0) <= 0) continue;
+					const key = h.Path;
+					if (!byPathMap.has(key)) byPathMap.set(key, []);
+					byPathMap.get(key).push(decorated[j].idx);
+				}
+				const pathGroups = Array.from(byPathMap.values());
+				pathGroups.sort(function(a, b) {
+					const pa = library.handles[a[0]].Path;
+					const pb = library.handles[b[0]].Path;
+					return collator.compare(
+						pa.substring(pa.lastIndexOf('\\') + 1),
+						pb.substring(pb.lastIndexOf('\\') + 1)
+					);
+				});
+				for (let gi = 0; gi < pathGroups.length; gi++) {
+					const idxList = pathGroups[gi];
+					const trackPath = library.handles[idxList[0]].Path;
+					if (tree.byId.has('track_' + trackPath + '_whole')) continue;
+					const trackName = trackPath.substring(trackPath.lastIndexOf('\\') + 1);
+					const trackNode = new TreeNode('track_' + trackPath + '_whole', trackName, 'track', node.id);
+					trackNode.data.path = trackPath;
+					trackNode.data.handleIndex = idxList[0];
+					trackNode.data.subSong = 0;
+					trackNode.data.handleIndexes = idxList;
+					trackNode.trackCount = idxList.length;
+					trackNode.level = node.level + 1;
+					node.children.push(trackNode);
+					tree.data.push(trackNode);
+					tree.byId.set(trackNode.id, trackNode);
+				}
 			}
 		}
 	}
@@ -956,6 +993,15 @@ function collectTracksFromNode(node) {
 	if (!library.handles) return handles;
 
 	if (node.type === 'track') {
+		if (node.data.handleIndexes) {
+			for (let i = 0; i < node.data.handleIndexes.length; i++) {
+				const idx = node.data.handleIndexes[i];
+				if (idx !== undefined && idx < library.handles.Count) {
+					handles.Add(library.handles[idx]);
+				}
+			}
+			return handles;
+		}
 		const idx = node.data.handleIndex;
 		if (idx !== undefined && idx < library.handles.Count) {
 			handles.Add(library.handles[idx]);
@@ -1097,9 +1143,15 @@ function updateNowPlayingNode() {
 
 	for (let j = 0; j < foundNode.children.length; j++) {
 		const child = foundNode.children[j];
-		if (child.type === 'track' && child.data.handleIndex === npIndex) {
-			nowPlaying.nodePath.add(child.id);
-			break;
+		if (child.type === 'track') {
+			if (child.data.handleIndex === npIndex) {
+				nowPlaying.nodePath.add(child.id);
+				break;
+			}
+			if (child.data.handleIndexes && child.data.handleIndexes.indexOf(npIndex) !== -1) {
+				nowPlaying.nodePath.add(child.id);
+				break;
+			}
 		}
 	}
 
